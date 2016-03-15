@@ -27,7 +27,7 @@
                 android:layout_height="@dimen/na_fixed_bottom_nav_icon_size"
                 android:layout_gravity="center_horizontal"
                 android:alpha="@dimen/na_inactive_opacity"
-                android:src="@drawable/ic_history"/>
+                android:src="@drawable/ic_na_test_history"/>
 
             <TextView
                 android:layout_width="wrap_content"
@@ -52,7 +52,7 @@
                 android:layout_width="@dimen/na_fixed_bottom_nav_icon_size"
                 android:layout_height="@dimen/na_fixed_bottom_nav_icon_size"
                 android:layout_gravity="center_horizontal"
-                android:src="@drawable/ic_favorite"
+                android:src="@drawable/ic_na_test_favorite"
                 android:tint="@color/colorAccent"/>
 
             <TextView
@@ -80,7 +80,7 @@
                 android:layout_height="@dimen/na_fixed_bottom_nav_icon_size"
                 android:layout_gravity="center_horizontal"
                 android:alpha="@dimen/na_inactive_opacity"
-                android:src="@drawable/ic_location"/>
+                android:src="@drawable/ic_na_test_location"/>
 
             <TextView
                 android:layout_width="wrap_content"

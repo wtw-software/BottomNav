@@ -39,11 +39,11 @@ public class BottomNavigationBar extends LinearLayout {
 
     @ColorInt
     private int mAccentColor;
-    private int mTabCount;
+    private int mTabCount, mCurrentTab;
     private boolean mUsesDarkTheme;
     private ArrayList<Tab> mTabs = new ArrayList<>();
     private LayoutGravity mLayoutGravity = LayoutGravity.FILL;
-    private OnTabClickedListener mOnTabClickedListener;
+    private OnTabSelectedListener mOnTabSelectedListener;
 
     public BottomNavigationBar(Context context) {
         super(context);
@@ -60,20 +60,23 @@ public class BottomNavigationBar extends LinearLayout {
             TypedArray ta = getContext().getTheme().obtainStyledAttributes(attrs, R.styleable.BottomNavigationBar, 0, 0);
 
             try {
-                mAccentColor = ta.getColor(R.styleable.BottomNavigationBar_accentColor, 0);
+                mUsesDarkTheme = ta.getBoolean(R.styleable.BottomNavigationBar_darkTheme, false);
+
+                mAccentColor = mUsesDarkTheme ? Color.WHITE
+                        : ta.getColor(R.styleable.BottomNavigationBar_accentColor, 0);
                 if (mAccentColor == 0) {
                     TypedValue tv = new TypedValue();
                     getContext().getTheme().resolveAttribute(R.attr.colorAccent, tv, true);
                     mAccentColor = tv.data;
                 }
-
-                mUsesDarkTheme = ta.getBoolean(R.styleable.BottomNavigationBar_darkTheme, false);
             } finally {
                 ta.recycle();
             }
 
             if (isInEditMode()) {
-                addTab(newTab().setText("Recents"));
+                addTab(newTab().setText("Recents").setIcon(R.drawable.ic_na_test_history));
+                addTab(newTab().setText("Favorites").setIcon(R.drawable.ic_na_test_favorite));
+                addTab(newTab().setText("Nearby").setIcon(R.drawable.ic_na_test_location));
             }
         }
 
@@ -109,7 +112,7 @@ public class BottomNavigationBar extends LinearLayout {
     }
 
     public Tab newTab() {
-        return new Tab(getContext(), true, mUsesDarkTheme);
+        return new Tab(getContext(), true);
     }
 
     private void checkTabCount() {
@@ -120,11 +123,14 @@ public class BottomNavigationBar extends LinearLayout {
     }
 
     public void setTabSelected(int position) {
-        for (Tab tab : mTabs) {
-            tab.setSelected(false);
-        }
+        if (getSelectedTabPosition() != position) {
+            for (Tab tab : mTabs) {
+                tab.setSelected(false);
+            }
 
-        mTabs.get(position).setSelected(true);
+            mCurrentTab = position;
+            mTabs.get(position).setSelected(true);
+        }
     }
 
     public int getSelectedTabPosition() {
@@ -166,8 +172,15 @@ public class BottomNavigationBar extends LinearLayout {
         mTabs.remove(position);
     }
 
-    public void setOnTabClickedListener(OnTabClickedListener listener) {
-        mOnTabClickedListener = listener;
+    public void setUsesDarkTheme(boolean usesDarkTheme) {
+        mUsesDarkTheme = usesDarkTheme;
+        for (Tab tab : mTabs) {
+            tab.adjustForDarkTheme();
+        }
+    }
+
+    public void setOnTabSelectedListener(OnTabSelectedListener listener) {
+        mOnTabSelectedListener = listener;
     }
 
     public enum LayoutGravity {
@@ -175,8 +188,12 @@ public class BottomNavigationBar extends LinearLayout {
         FILL
     }
 
-    public interface OnTabClickedListener {
-        void onTabClicked(Tab tab, int position);
+    public interface OnTabSelectedListener {
+        void onTabSelected(Tab tab, int position);
+
+        void onTabReselected(Tab tab, int position);
+
+        void onTabUnselected(Tab tab, int position);
     }
 
     public class Tab {
@@ -186,7 +203,7 @@ public class BottomNavigationBar extends LinearLayout {
         private Drawable mOriginalDrawable;
         private int mOriginalDrawableResource;
 
-        private Tab(Context c, boolean isFixed, boolean isDarkThemed) {
+        private Tab(Context c, boolean isFixed) {
             mIsFixed = isFixed;
 
             mView = new FrameLayout(c);
@@ -196,10 +213,19 @@ public class BottomNavigationBar extends LinearLayout {
             mView.setOnClickListener(new OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    setTabSelected(((ViewGroup) v.getParent()).indexOfChild(v));
-                    if (mOnTabClickedListener != null) {
-                        mOnTabClickedListener.onTabClicked(Tab.this, ((ViewGroup) v.getParent()).indexOfChild(v));
+                    int position = (((ViewGroup) v.getParent())).indexOfChild(v);
+                    if (mOnTabSelectedListener != null) {
+                        if (mIsSelected) {
+                            // This tab has been reselected
+                            mOnTabSelectedListener.onTabReselected(Tab.this, position);
+                        } else {
+                            // New tab selected
+                            mOnTabSelectedListener.onTabSelected(Tab.this, position);
+                            mOnTabSelectedListener.onTabUnselected(mTabs.get(mCurrentTab), mCurrentTab);
+                        }
                     }
+
+                    setTabSelected(position);
                 }
             });
 
@@ -216,7 +242,7 @@ public class BottomNavigationBar extends LinearLayout {
             FrameLayout.LayoutParams iconLp = new FrameLayout.LayoutParams(iconSize, iconSize);
             iconLp.gravity = Gravity.CENTER_HORIZONTAL;
             iv.setLayoutParams(iconLp);
-            iv.setAlpha(Utils.getFloatResource(c, R.dimen.na_inactive_opacity));
+            iv.setAlpha(Utils.getFloatResource(c, mUsesDarkTheme ? R.dimen.na_inactive_opacity_dark : R.dimen.na_inactive_opacity));
             mView.addView(iv);
 
             TextView tv = new TextView(c);
@@ -227,6 +253,7 @@ public class BottomNavigationBar extends LinearLayout {
             tv.setSingleLine();
             tv.setTextSize(TypedValue.COMPLEX_UNIT_PX,
                     c.getResources().getDimension(R.dimen.na_fixed_bottom_nav_text_size_inactive));
+            tv.setTextColor(ContextCompat.getColor(c, mUsesDarkTheme ? R.color.inactive_tint_dark : R.color.inactive_tint));
             mView.addView(tv);
         }
 
@@ -274,7 +301,8 @@ public class BottomNavigationBar extends LinearLayout {
                 setupAnimator(textSizeAnim).start();
 
                 ValueAnimator imageAlphaAnim = ValueAnimator.ofFloat(mView.getChildAt(0).getAlpha(),
-                        selected ? 1f : Utils.getFloatResource(mView.getContext(), R.dimen.na_inactive_opacity));
+                        selected ? 1f : Utils.getFloatResource(mView.getContext(),
+                                mUsesDarkTheme ? R.dimen.na_inactive_opacity_dark : R.dimen.na_inactive_opacity));
                 imageAlphaAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
                     @Override
                     public void onAnimationUpdate(ValueAnimator animation) {
@@ -285,7 +313,8 @@ public class BottomNavigationBar extends LinearLayout {
 
                 ValueAnimator textColorAnim = ValueAnimator.ofObject(new ArgbEvaluator(),
                         ((TextView) mView.getChildAt(1)).getCurrentTextColor(), selected ? mAccentColor
-                                : ContextCompat.getColor(mView.getContext(), R.color.inactive_tint));
+                                : ContextCompat.getColor(mView.getContext(),
+                                mUsesDarkTheme ? R.color.inactive_tint_dark : R.color.inactive_tint));
                 textColorAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
                     @Override
                     public void onAnimationUpdate(ValueAnimator animation) {
@@ -296,9 +325,10 @@ public class BottomNavigationBar extends LinearLayout {
 
                 // We'll only animate image tint if the selection state of this tab has changed
                 if (wasPreviouslySelected != selected) {
+                    int originalColor = mUsesDarkTheme ? Color.WHITE : Color.BLACK;
                     ValueAnimator imageTintAnim = ValueAnimator.ofObject(new ArgbEvaluator(),
-                            selected ? Color.BLACK : mAccentColor,
-                            selected ? mAccentColor : Color.BLACK);
+                            selected ? originalColor : mAccentColor,
+                            selected ? mAccentColor : originalColor);
                     imageTintAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
                         @Override
                         public void onAnimationUpdate(ValueAnimator animation) {
@@ -332,34 +362,68 @@ public class BottomNavigationBar extends LinearLayout {
             return anim;
         }
 
+        public void adjustForDarkTheme() {
+            if (mOriginalDrawable != null) {
+                setIcon(mOriginalDrawable);
+            } else if (mOriginalDrawableResource != 0) {
+                setIcon(mOriginalDrawableResource);
+            }
+
+            float alpha;
+            if (mIsSelected) {
+                alpha = 1f;
+            } else {
+                alpha = Utils.getFloatResource(mView.getContext(),
+                        mUsesDarkTheme ? R.dimen.na_inactive_opacity_dark : R.dimen.na_inactive_opacity);
+            }
+            mView.getChildAt(0).setAlpha(alpha);
+
+            int textColor;
+            if (mUsesDarkTheme) {
+                textColor = mIsSelected ? Color.WHITE : ContextCompat.getColor(mView.getContext(), R.color.inactive_tint_dark);
+            } else {
+                textColor = mIsSelected ? mAccentColor : ContextCompat.getColor(mView.getContext(), R.color.inactive_tint);
+            }
+            // noinspection ResourceType
+            ((TextView) mView.getChildAt(1)).setTextColor(textColor);
+        }
+
         @Nullable
         public Drawable getIcon() {
             return ((ImageView) mView.getChildAt(0)).getDrawable();
         }
 
-        public Tab setIcon(Drawable d) {
-            ((ImageView) mView.getChildAt(0)).setImageDrawable(d);
-            mOriginalDrawable = d;
+        public Tab setIcon(@DrawableRes int res) {
+            mOriginalDrawableResource = res;
+            mOriginalDrawable = ContextCompat.getDrawable(mView.getContext(), res);
+            ((ImageView) mView.getChildAt(0))
+                    .setImageDrawable(tintDrawableForTheme(mOriginalDrawable));
             return this;
         }
 
-        public Tab setIcon(@DrawableRes int res) {
-            ((ImageView) mView.getChildAt(0)).setImageResource(res);
-            mOriginalDrawableResource = res;
+        public Tab setIcon(Drawable d) {
+            mOriginalDrawable = d;
+            ((ImageView) mView.getChildAt(0)).setImageDrawable(tintDrawableForTheme(mOriginalDrawable));
             return this;
+        }
+
+        private Drawable tintDrawableForTheme(Drawable d) {
+            Drawable wrappedDrawable = DrawableCompat.wrap(d);
+            DrawableCompat.setTint(wrappedDrawable, mUsesDarkTheme ? Color.WHITE : Color.BLACK);
+            return wrappedDrawable;
         }
 
         public CharSequence getText() {
             return ((TextView) mView.getChildAt(1)).getText();
         }
 
-        public Tab setText(CharSequence s) {
-            ((TextView) mView.getChildAt(1)).setText(s);
+        public Tab setText(@StringRes int res) {
+            ((TextView) mView.getChildAt(1)).setText(res);
             return this;
         }
 
-        public Tab setText(@StringRes int res) {
-            ((TextView) mView.getChildAt(1)).setText(res);
+        public Tab setText(CharSequence s) {
+            ((TextView) mView.getChildAt(1)).setText(s);
             return this;
         }
 
