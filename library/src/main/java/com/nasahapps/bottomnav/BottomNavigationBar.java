@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.support.annotation.ColorInt;
 import android.support.annotation.DrawableRes;
 import android.support.annotation.Nullable;
@@ -16,6 +17,7 @@ import android.support.v4.content.ContextCompat;
 import android.support.v4.graphics.drawable.DrawableCompat;
 import android.support.v4.view.ViewCompat;
 import android.support.v4.view.animation.FastOutSlowInInterpolator;
+import android.transition.TransitionManager;
 import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -162,6 +164,11 @@ public class BottomNavigationBar extends LinearLayout {
             if (mTabs.get(i).equals(tab)) {
                 removeView(mTabs.get(i).getView());
                 mTabs.remove(i);
+
+                if (getSelectedTabPosition() == INVALID_TAB_POSITION) {
+                    setTabSelected(0);
+                }
+
                 break;
             }
         }
@@ -174,6 +181,10 @@ public class BottomNavigationBar extends LinearLayout {
     public void removeTabAt(int position) {
         removeView(mTabs.get(position).getView());
         mTabs.remove(position);
+
+        if (getSelectedTabPosition() == INVALID_TAB_POSITION) {
+            setTabSelected(0);
+        }
 
         for (Tab tab1 : mTabs) {
             tab1.adjustForFixedMode(mTabs.size() <= 3);
@@ -224,7 +235,7 @@ public class BottomNavigationBar extends LinearLayout {
 
             mView = new LinearLayout(c);
             TypedValue typedValue = new TypedValue();
-            c.getTheme().resolveAttribute(R.attr.selectableItemBackgroundBorderless, typedValue, true);
+            c.getTheme().resolveAttribute(R.attr.selectableItemBackground, typedValue, true);
             mView.setBackgroundResource(typedValue.resourceId);
             mView.setOnClickListener(new OnClickListener() {
                 @Override
@@ -244,7 +255,11 @@ public class BottomNavigationBar extends LinearLayout {
                     setTabSelected(position);
                 }
             });
-            mView.setLayoutTransition(new LayoutTransition());
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
+                // Pre-Kitkat, we'll just use the standard LayoutTransition APIs
+                // but post-Kitkat, we'll use the new Transition APIs for layout adjustments
+                mView.setLayoutTransition(new LayoutTransition());
+            }
             mView.setOrientation(VERTICAL);
             mView.setGravity(Gravity.CENTER);
 
@@ -257,8 +272,9 @@ public class BottomNavigationBar extends LinearLayout {
             mView.addView(iv);
 
             TextView tv = new TextView(c);
-            tv.setLayoutParams(new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            tv.setLayoutParams(new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             tv.setSingleLine();
+            tv.setGravity(Gravity.CENTER);
             float textSize;
             if (mIsFixed) {
                 textSize = c.getResources().getDimension(mIsSelected ? R.dimen.na_fixed_bottom_nav_text_size_active
@@ -319,6 +335,8 @@ public class BottomNavigationBar extends LinearLayout {
         }
 
         public void adjustForDarkTheme() {
+            beginDelayedTransition();
+
             if (mOriginalDrawable != null) {
                 setIcon(mOriginalDrawable);
             } else if (mOriginalDrawableResource != 0) {
@@ -354,6 +372,8 @@ public class BottomNavigationBar extends LinearLayout {
         }
 
         public void adjustTabWidth(boolean fixed) {
+            beginDelayedTransition();
+
             int fullWidth = ((View) mView.getParent()).getMeasuredWidth();
             int tabWidth;
             // For these tabs to have the "suggested" width (particularly for shifting tabs),
@@ -393,6 +413,12 @@ public class BottomNavigationBar extends LinearLayout {
             inactiveWidth = Math.max(inactiveWidth, mView.getResources().getDimensionPixelSize(R.dimen.na_shifting_bottom_nav_tab_min_width_inactive));
             inactiveWidth = Math.min(inactiveWidth, mView.getResources().getDimensionPixelSize(R.dimen.na_shifting_bottom_nav_tab_max_width_inactive));
             return inactiveWidth;
+        }
+
+        private void beginDelayedTransition() {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                TransitionManager.beginDelayedTransition(mView);
+            }
         }
 
         private void animateTextSize(boolean selected, boolean fixed) {
