@@ -18,11 +18,15 @@ public class MainActivity extends AppCompatActivity implements BottomNavigationB
         mBottomNavigationBar = (BottomNavigationBar) findViewById(R.id.bottomNav);
         mBottomNavigationBar.setOnTabSelectedListener(this);
         mBottomNavigationBar.addTab(mBottomNavigationBar.newTab().setText("Recents")
-                .setIcon(R.drawable.ic_na_test_history));
+                .setIcon(R.drawable.ic_history));
         mBottomNavigationBar.addTab(mBottomNavigationBar.newTab().setText("Favorites")
-                .setIcon(R.drawable.ic_na_test_favorite));
+                .setIcon(R.drawable.ic_favorite));
         mBottomNavigationBar.addTab(mBottomNavigationBar.newTab().setText("Nearby")
-                .setIcon(R.drawable.ic_na_test_location));
+                .setIcon(R.drawable.ic_location));
+        mBottomNavigationBar.addTab(mBottomNavigationBar.newTab().setText("Movies")
+                .setIcon(R.drawable.ic_movie));
+        mBottomNavigationBar.addTab(mBottomNavigationBar.newTab().setText("Music")
+                .setIcon(R.drawable.ic_music));
     }
 
     @Override

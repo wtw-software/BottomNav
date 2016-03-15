@@ -2,6 +2,7 @@ package com.nasahapps.bottomnav;
 
 import android.animation.Animator;
 import android.animation.ArgbEvaluator;
+import android.animation.LayoutTransition;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.res.TypedArray;
@@ -21,7 +22,6 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.Interpolator;
-import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -77,6 +77,8 @@ public class BottomNavigationBar extends LinearLayout {
                 addTab(newTab().setText("Recents").setIcon(R.drawable.ic_na_test_history));
                 addTab(newTab().setText("Favorites").setIcon(R.drawable.ic_na_test_favorite));
                 addTab(newTab().setText("Nearby").setIcon(R.drawable.ic_na_test_location));
+                addTab(newTab().setText("Movies").setIcon(R.drawable.ic_na_test_movie));
+                addTab(newTab().setText("Music").setIcon(R.drawable.ic_na_test_music));
             }
         }
 
@@ -104,15 +106,14 @@ public class BottomNavigationBar extends LinearLayout {
             setTabSelected(position);
         }
 
-        if (mTabCount <= 3) {
-            addView(tab.getView(), new LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1));
-        } else {
-
+        addView(tab.getView(), new LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1));
+        for (Tab tab1 : mTabs) {
+            tab1.adjustForFixedMode(mTabCount <= 3);
         }
     }
 
     public Tab newTab() {
-        return new Tab(getContext(), true);
+        return new Tab(getContext(), mTabCount < 3);
     }
 
     private void checkTabCount() {
@@ -198,7 +199,7 @@ public class BottomNavigationBar extends LinearLayout {
 
     public class Tab {
 
-        private FrameLayout mView;
+        private LinearLayout mView;
         private boolean mIsSelected, mIsFixed;
         private Drawable mOriginalDrawable;
         private int mOriginalDrawableResource;
@@ -206,7 +207,7 @@ public class BottomNavigationBar extends LinearLayout {
         private Tab(Context c, boolean isFixed) {
             mIsFixed = isFixed;
 
-            mView = new FrameLayout(c);
+            mView = new LinearLayout(c);
             TypedValue typedValue = new TypedValue();
             c.getTheme().resolveAttribute(R.attr.selectableItemBackgroundBorderless, typedValue, true);
             mView.setBackgroundResource(typedValue.resourceId);
@@ -228,33 +229,55 @@ public class BottomNavigationBar extends LinearLayout {
                     setTabSelected(position);
                 }
             });
+            mView.setLayoutTransition(new LayoutTransition());
+            mView.setOrientation(VERTICAL);
+            mView.setGravity(Gravity.CENTER);
 
-            if (isFixed) {
-                mView.setMinimumWidth(c.getResources().getDimensionPixelSize(R.dimen.na_fixed_bottom_nav_tab_min_width));
-                mView.setPadding(c.getResources().getDimensionPixelSize(R.dimen.na_fixed_bottom_nav_padding_sides),
-                        c.getResources().getDimensionPixelSize(R.dimen.na_fixed_bottom_nav_padding_top_inactive),
-                        c.getResources().getDimensionPixelSize(R.dimen.na_fixed_bottom_nav_padding_sides),
-                        c.getResources().getDimensionPixelSize(R.dimen.na_fixed_bottom_nav_padding_bottom));
-            }
+            adjustMinimumWidth(mIsFixed);
+            adjustPadding(mIsFixed);
 
             int iconSize = c.getResources().getDimensionPixelSize(R.dimen.na_fixed_bottom_nav_icon_size);
             ImageView iv = new ImageView(c);
-            FrameLayout.LayoutParams iconLp = new FrameLayout.LayoutParams(iconSize, iconSize);
-            iconLp.gravity = Gravity.CENTER_HORIZONTAL;
-            iv.setLayoutParams(iconLp);
+            iv.setLayoutParams(new LayoutParams(iconSize, iconSize));
             iv.setAlpha(Utils.getFloatResource(c, mUsesDarkTheme ? R.dimen.na_inactive_opacity_dark : R.dimen.na_inactive_opacity));
             mView.addView(iv);
 
             TextView tv = new TextView(c);
-            FrameLayout.LayoutParams textLp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT);
-            textLp.gravity = Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM;
-            tv.setLayoutParams(textLp);
+            tv.setLayoutParams(new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             tv.setSingleLine();
-            tv.setTextSize(TypedValue.COMPLEX_UNIT_PX,
-                    c.getResources().getDimension(R.dimen.na_fixed_bottom_nav_text_size_inactive));
+            float textSize;
+            if (mIsFixed) {
+                textSize = c.getResources().getDimension(mIsSelected ? R.dimen.na_fixed_bottom_nav_text_size_active
+                        : R.dimen.na_fixed_bottom_nav_text_size_inactive);
+            } else {
+                textSize = c.getResources().getDimension(R.dimen.na_shifting_bottom_nav_text_size);
+            }
+            tv.setTextSize(TypedValue.COMPLEX_UNIT_PX, textSize);
             tv.setTextColor(ContextCompat.getColor(c, mUsesDarkTheme ? R.color.inactive_tint_dark : R.color.inactive_tint));
             mView.addView(tv);
+            if (!mIsFixed) {
+                tv.setVisibility(mIsSelected ? VISIBLE : GONE);
+            }
+        }
+
+        private void adjustMinimumWidth(boolean fixed) {
+            if (fixed) {
+                mView.setMinimumWidth(mView.getResources().getDimensionPixelSize(R.dimen.na_fixed_bottom_nav_tab_min_width));
+            } else {
+                mView.setMinimumWidth(mView.getResources().getDimensionPixelSize(mIsSelected ? R.dimen.na_shifting_bottom_nav_tab_min_width_active
+                        : R.dimen.na_shifting_bottom_nav_tab_min_width_inactive));
+            }
+        }
+
+        private void adjustPadding(boolean fixed) {
+            if (fixed) {
+                mView.setPadding(mView.getResources().getDimensionPixelSize(R.dimen.na_fixed_bottom_nav_padding_sides),
+                        mView.getResources().getDimensionPixelSize(mIsSelected ? R.dimen.na_fixed_bottom_nav_padding_top_active : R.dimen.na_fixed_bottom_nav_padding_top_inactive),
+                        mView.getResources().getDimensionPixelSize(R.dimen.na_fixed_bottom_nav_padding_sides),
+                        mView.getResources().getDimensionPixelSize(R.dimen.na_fixed_bottom_nav_padding_bottom));
+            } else {
+                mView.setPadding(0, 0, 0, 0);
+            }
         }
 
         public boolean isFixed() {
@@ -274,83 +297,14 @@ public class BottomNavigationBar extends LinearLayout {
             boolean wasPreviouslySelected = mIsSelected;
             mIsSelected = selected;
 
-            if (mIsFixed) {
-                // Animate changes in paddingTop and textSize, as well as tint color
-                ValueAnimator paddingTopAnim = ValueAnimator.ofInt(mView.getPaddingTop(),
-                        mView.getResources().getDimensionPixelSize(selected ? R.dimen.na_fixed_bottom_nav_padding_top_active
-                                : R.dimen.na_fixed_bottom_nav_padding_top_inactive));
-                paddingTopAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-                    @Override
-                    public void onAnimationUpdate(ValueAnimator animation) {
-                        mView.setPadding(mView.getPaddingLeft(), (int) animation.getAnimatedValue(),
-                                mView.getPaddingRight(), mView.getPaddingBottom());
-                    }
-                });
-                setupAnimator(paddingTopAnim).start();
-
-                ValueAnimator textSizeAnim = ValueAnimator.ofFloat(((TextView) mView.getChildAt(1)).getTextSize(),
-                        mView.getResources().getDimension(selected ? R.dimen.na_fixed_bottom_nav_text_size_active
-                                : R.dimen.na_fixed_bottom_nav_text_size_inactive));
-                textSizeAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-                    @Override
-                    public void onAnimationUpdate(ValueAnimator animation) {
-                        ((TextView) mView.getChildAt(1)).setTextSize(TypedValue.COMPLEX_UNIT_PX,
-                                (float) animation.getAnimatedValue());
-                    }
-                });
-                setupAnimator(textSizeAnim).start();
-
-                ValueAnimator imageAlphaAnim = ValueAnimator.ofFloat(mView.getChildAt(0).getAlpha(),
-                        selected ? 1f : Utils.getFloatResource(mView.getContext(),
-                                mUsesDarkTheme ? R.dimen.na_inactive_opacity_dark : R.dimen.na_inactive_opacity));
-                imageAlphaAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-                    @Override
-                    public void onAnimationUpdate(ValueAnimator animation) {
-                        mView.getChildAt(0).setAlpha((float) animation.getAnimatedValue());
-                    }
-                });
-                setupAnimator(imageAlphaAnim).start();
-
-                ValueAnimator textColorAnim = ValueAnimator.ofObject(new ArgbEvaluator(),
-                        ((TextView) mView.getChildAt(1)).getCurrentTextColor(), selected ? mAccentColor
-                                : ContextCompat.getColor(mView.getContext(),
-                                mUsesDarkTheme ? R.color.inactive_tint_dark : R.color.inactive_tint));
-                textColorAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-                    @Override
-                    public void onAnimationUpdate(ValueAnimator animation) {
-                        ((TextView) mView.getChildAt(1)).setTextColor((int) animation.getAnimatedValue());
-                    }
-                });
-                setupAnimator(textColorAnim).start();
-
-                // We'll only animate image tint if the selection state of this tab has changed
-                if (wasPreviouslySelected != selected) {
-                    int originalColor = mUsesDarkTheme ? Color.WHITE : Color.BLACK;
-                    ValueAnimator imageTintAnim = ValueAnimator.ofObject(new ArgbEvaluator(),
-                            selected ? originalColor : mAccentColor,
-                            selected ? mAccentColor : originalColor);
-                    imageTintAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-                        @Override
-                        public void onAnimationUpdate(ValueAnimator animation) {
-                            Drawable wrappedDrawable = null;
-                            if (mOriginalDrawable != null) {
-                                wrappedDrawable = DrawableCompat.wrap(mOriginalDrawable);
-                            } else if (mOriginalDrawableResource != 0) {
-                                wrappedDrawable = DrawableCompat.wrap(ContextCompat.getDrawable(mView.getContext(),
-                                        mOriginalDrawableResource));
-                            }
-
-                            if (wrappedDrawable != null) {
-                                wrappedDrawable = DrawableCompat.wrap(wrappedDrawable);
-                                DrawableCompat.setTint(wrappedDrawable, (int) animation.getAnimatedValue());
-                                ((ImageView) mView.getChildAt(0)).setImageDrawable(wrappedDrawable);
-                            }
-                        }
-                    });
-                    setupAnimator(imageTintAnim).start();
-                }
-            } else {
-
+            // Animate changes in paddingTop and textSize, as well as tint color
+            animateTopPadding(selected, mIsFixed);
+            animateTextSize(selected, mIsFixed);
+            animateImageAlpha(selected);
+            animateTextColor(selected, mIsFixed);
+            // We'll only animate image tint if the selection state of this tab has changed
+            if (wasPreviouslySelected != selected) {
+                animateImageTint(selected);
             }
 
             return this;
@@ -388,9 +342,129 @@ public class BottomNavigationBar extends LinearLayout {
             ((TextView) mView.getChildAt(1)).setTextColor(textColor);
         }
 
+        public void adjustForFixedMode(boolean fixed) {
+            if (mIsFixed != fixed) {
+                // Readjust
+                mIsFixed = fixed;
+                adjustMinimumWidth(fixed);
+                adjustPadding(fixed);
+                setSelected(mIsSelected);
+            }
+        }
+
+        private void animateTopPadding(boolean selected, boolean fixed) {
+            // We'll only animate the top padding in fixed mode
+            if (fixed) {
+                int endingPaddingTop = mView.getResources().getDimensionPixelSize(selected ? R.dimen.na_fixed_bottom_nav_padding_top_active
+                        : R.dimen.na_fixed_bottom_nav_padding_top_inactive);
+                ValueAnimator paddingTopAnim = ValueAnimator.ofInt(mView.getPaddingTop(), endingPaddingTop);
+                paddingTopAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                    @Override
+                    public void onAnimationUpdate(ValueAnimator animation) {
+                        mView.setPadding(mView.getPaddingLeft(), (int) animation.getAnimatedValue(),
+                                mView.getPaddingRight(), mView.getPaddingBottom());
+                    }
+                });
+                setupAnimator(paddingTopAnim).start();
+            } else {
+                mView.setPadding(0, 0, 0, 0);
+            }
+        }
+
+        private void animateTextSize(boolean selected, boolean fixed) {
+            if (fixed) {
+                float endingTextSize = mView.getResources().getDimension(selected ? R.dimen.na_fixed_bottom_nav_text_size_active
+                        : R.dimen.na_fixed_bottom_nav_text_size_inactive);
+                ValueAnimator textSizeAnim = ValueAnimator.ofFloat(((TextView) mView.getChildAt(1)).getTextSize(),
+                        endingTextSize);
+                textSizeAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                    @Override
+                    public void onAnimationUpdate(ValueAnimator animation) {
+                        ((TextView) mView.getChildAt(1)).setTextSize(TypedValue.COMPLEX_UNIT_PX,
+                                (float) animation.getAnimatedValue());
+                    }
+                });
+                setupAnimator(textSizeAnim).start();
+            } else {
+                ((TextView) mView.getChildAt(1)).setTextSize(TypedValue.COMPLEX_UNIT_PX,
+                        mView.getResources().getDimension(R.dimen.na_shifting_bottom_nav_text_size));
+            }
+        }
+
+        private void animateImageAlpha(boolean selected) {
+            ValueAnimator imageAlphaAnim = ValueAnimator.ofFloat(mView.getChildAt(0).getAlpha(),
+                    selected ? 1f : Utils.getFloatResource(mView.getContext(),
+                            mUsesDarkTheme ? R.dimen.na_inactive_opacity_dark : R.dimen.na_inactive_opacity));
+            imageAlphaAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                @Override
+                public void onAnimationUpdate(ValueAnimator animation) {
+                    mView.getChildAt(0).setAlpha((float) animation.getAnimatedValue());
+                }
+            });
+            setupAnimator(imageAlphaAnim).start();
+        }
+
+        private void animateTextColor(boolean selected, boolean fixed) {
+            // If fixed, we'll actually animate the text color
+            // but if shifting, we'll just have the text be VISIBLE/GONE
+            int endingColor;
+            if (selected) {
+                endingColor = mAccentColor;
+            } else {
+                endingColor = ContextCompat.getColor(mView.getContext(),
+                        mUsesDarkTheme ? R.color.inactive_tint_dark : R.color.inactive_tint);
+            }
+            if (fixed) {
+                ValueAnimator textColorAnim = ValueAnimator.ofObject(new ArgbEvaluator(),
+                        ((TextView) mView.getChildAt(1)).getCurrentTextColor(), endingColor);
+                textColorAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                    @Override
+                    public void onAnimationUpdate(ValueAnimator animation) {
+                        ((TextView) mView.getChildAt(1)).setTextColor((int) animation.getAnimatedValue());
+                    }
+                });
+                setupAnimator(textColorAnim).start();
+            } else {
+                ((TextView) mView.getChildAt(1)).setTextColor(endingColor);
+                mView.getChildAt(1).setVisibility(selected ? VISIBLE : GONE);
+            }
+        }
+
+        private void animateImageTint(boolean selected) {
+            int originalColor = mUsesDarkTheme ? Color.WHITE : Color.BLACK;
+            ValueAnimator imageTintAnim = ValueAnimator.ofObject(new ArgbEvaluator(),
+                    selected ? originalColor : mAccentColor,
+                    selected ? mAccentColor : originalColor);
+            imageTintAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                @Override
+                public void onAnimationUpdate(ValueAnimator animation) {
+                    Drawable wrappedDrawable = null;
+                    if (mOriginalDrawable != null) {
+                        wrappedDrawable = DrawableCompat.wrap(mOriginalDrawable);
+                    } else if (mOriginalDrawableResource != 0) {
+                        wrappedDrawable = DrawableCompat.wrap(ContextCompat.getDrawable(mView.getContext(),
+                                mOriginalDrawableResource));
+                    }
+
+                    if (wrappedDrawable != null) {
+                        wrappedDrawable = DrawableCompat.wrap(wrappedDrawable);
+                        DrawableCompat.setTint(wrappedDrawable, (int) animation.getAnimatedValue());
+                        ((ImageView) mView.getChildAt(0)).setImageDrawable(wrappedDrawable);
+                    }
+                }
+            });
+            setupAnimator(imageTintAnim).start();
+        }
+
         @Nullable
         public Drawable getIcon() {
             return ((ImageView) mView.getChildAt(0)).getDrawable();
+        }
+
+        public Tab setIcon(Drawable d) {
+            mOriginalDrawable = d;
+            ((ImageView) mView.getChildAt(0)).setImageDrawable(tintDrawableForTheme(mOriginalDrawable));
+            return this;
         }
 
         public Tab setIcon(@DrawableRes int res) {
@@ -398,12 +472,6 @@ public class BottomNavigationBar extends LinearLayout {
             mOriginalDrawable = ContextCompat.getDrawable(mView.getContext(), res);
             ((ImageView) mView.getChildAt(0))
                     .setImageDrawable(tintDrawableForTheme(mOriginalDrawable));
-            return this;
-        }
-
-        public Tab setIcon(Drawable d) {
-            mOriginalDrawable = d;
-            ((ImageView) mView.getChildAt(0)).setImageDrawable(tintDrawableForTheme(mOriginalDrawable));
             return this;
         }
 
@@ -417,13 +485,13 @@ public class BottomNavigationBar extends LinearLayout {
             return ((TextView) mView.getChildAt(1)).getText();
         }
 
-        public Tab setText(@StringRes int res) {
-            ((TextView) mView.getChildAt(1)).setText(res);
+        public Tab setText(CharSequence s) {
+            ((TextView) mView.getChildAt(1)).setText(s);
             return this;
         }
 
-        public Tab setText(CharSequence s) {
-            ((TextView) mView.getChildAt(1)).setText(s);
+        public Tab setText(@StringRes int res) {
+            ((TextView) mView.getChildAt(1)).setText(res);
             return this;
         }
 
