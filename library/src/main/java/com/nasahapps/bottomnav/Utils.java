@@ -24,4 +24,8 @@ class Utils {
         return tv.getFloat();
     }
 
+    public static int pixelToDp(Context c, int px) {
+        return (int) (px / c.getResources().getDisplayMetrics().density);
+    }
+
 }

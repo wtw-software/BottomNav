@@ -106,9 +106,11 @@ public class BottomNavigationBar extends LinearLayout {
             setTabSelected(position);
         }
 
-        addView(tab.getView(), new LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1));
+        boolean fixed = mTabCount <= 3;
+        addView(tab.getView(), new LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT));
         for (Tab tab1 : mTabs) {
-            tab1.adjustForFixedMode(mTabCount <= 3);
+            tab1.adjustForFixedMode(fixed);
+//            tab1.adjustTabWidth(fixed);
         }
     }
 
@@ -184,6 +186,14 @@ public class BottomNavigationBar extends LinearLayout {
         mOnTabSelectedListener = listener;
     }
 
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+        for (Tab tab : mTabs) {
+            tab.adjustTabWidth(mTabCount <= 3);
+        }
+    }
+
     public enum LayoutGravity {
         CENTER,
         FILL
@@ -234,7 +244,6 @@ public class BottomNavigationBar extends LinearLayout {
             mView.setGravity(Gravity.CENTER);
 
             adjustMinimumWidth(mIsFixed);
-            adjustPadding(mIsFixed);
 
             int iconSize = c.getResources().getDimensionPixelSize(R.dimen.na_fixed_bottom_nav_icon_size);
             ImageView iv = new ImageView(c);
@@ -269,17 +278,6 @@ public class BottomNavigationBar extends LinearLayout {
             }
         }
 
-        private void adjustPadding(boolean fixed) {
-            if (fixed) {
-                mView.setPadding(mView.getResources().getDimensionPixelSize(R.dimen.na_fixed_bottom_nav_padding_sides),
-                        mView.getResources().getDimensionPixelSize(mIsSelected ? R.dimen.na_fixed_bottom_nav_padding_top_active : R.dimen.na_fixed_bottom_nav_padding_top_inactive),
-                        mView.getResources().getDimensionPixelSize(R.dimen.na_fixed_bottom_nav_padding_sides),
-                        mView.getResources().getDimensionPixelSize(R.dimen.na_fixed_bottom_nav_padding_bottom));
-            } else {
-                mView.setPadding(0, 0, 0, 0);
-            }
-        }
-
         public boolean isFixed() {
             return mIsFixed;
         }
@@ -298,7 +296,6 @@ public class BottomNavigationBar extends LinearLayout {
             mIsSelected = selected;
 
             // Animate changes in paddingTop and textSize, as well as tint color
-            animateTopPadding(selected, mIsFixed);
             animateTextSize(selected, mIsFixed);
             animateImageAlpha(selected);
             animateTextColor(selected, mIsFixed);
@@ -347,28 +344,50 @@ public class BottomNavigationBar extends LinearLayout {
                 // Readjust
                 mIsFixed = fixed;
                 adjustMinimumWidth(fixed);
-                adjustPadding(fixed);
                 setSelected(mIsSelected);
             }
         }
 
-        private void animateTopPadding(boolean selected, boolean fixed) {
-            // We'll only animate the top padding in fixed mode
-            if (fixed) {
-                int endingPaddingTop = mView.getResources().getDimensionPixelSize(selected ? R.dimen.na_fixed_bottom_nav_padding_top_active
-                        : R.dimen.na_fixed_bottom_nav_padding_top_inactive);
-                ValueAnimator paddingTopAnim = ValueAnimator.ofInt(mView.getPaddingTop(), endingPaddingTop);
-                paddingTopAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-                    @Override
-                    public void onAnimationUpdate(ValueAnimator animation) {
-                        mView.setPadding(mView.getPaddingLeft(), (int) animation.getAnimatedValue(),
-                                mView.getPaddingRight(), mView.getPaddingBottom());
-                    }
-                });
-                setupAnimator(paddingTopAnim).start();
+        public void adjustTabWidth(boolean fixed) {
+            int fullWidth = ((View) mView.getParent()).getMeasuredWidth();
+            int tabWidth;
+            // For these tabs to have the "suggested" width (particularly for shifting tabs),
+            // the absolute minimum width of the entire bottom nav bar must be at least 352dp for 5 tabs
+            // (288 for 4 tabs)
+            // Any smaller and we can't apply the suggested tab width
+            if ((mTabCount == 4 && Utils.pixelToDp(mView.getContext(), fullWidth) <= 288)
+                    || (mTabCount == 5 && Utils.pixelToDp(mView.getContext(), fullWidth) <= 352)) {
+                tabWidth = fullWidth / mTabCount;
             } else {
-                mView.setPadding(0, 0, 0, 0);
+                if (fixed) {
+                    tabWidth = Math.max(fullWidth / mTabCount, mView.getResources().getDimensionPixelSize(R.dimen.na_fixed_bottom_nav_tab_min_width));
+                    tabWidth = Math.min(tabWidth, mView.getResources().getDimensionPixelSize(R.dimen.na_fixed_bottom_nav_tab_max_width));
+                } else {
+                    tabWidth = mIsSelected ? calculateActiveTabWidth() : calculateInactiveTabWidth();
+                }
             }
+
+            LayoutParams lp = (LayoutParams) mView.getLayoutParams();
+            lp.width = tabWidth;
+            mView.setLayoutParams(lp);
+        }
+
+        private int calculateActiveTabWidth() {
+            int fullWidth = ((View) mView.getParent()).getMeasuredWidth();
+            int inactiveMinWidth = mView.getResources().getDimensionPixelSize(R.dimen.na_shifting_bottom_nav_tab_min_width_inactive);
+            int activeWidth = fullWidth - ((mTabCount - 1) * inactiveMinWidth);
+            activeWidth = Math.max(activeWidth, mView.getResources().getDimensionPixelSize(R.dimen.na_shifting_bottom_nav_tab_min_width_active));
+            activeWidth = Math.min(activeWidth, mView.getResources().getDimensionPixelSize(R.dimen.na_shifting_bottom_nav_tab_max_width_active));
+            return activeWidth;
+        }
+
+        private int calculateInactiveTabWidth() {
+            int activeWidth = calculateActiveTabWidth();
+            int fullWidth = ((View) mView.getParent()).getMeasuredWidth();
+            int inactiveWidth = ((fullWidth - activeWidth) / (mTabCount - 1));
+            inactiveWidth = Math.max(inactiveWidth, mView.getResources().getDimensionPixelSize(R.dimen.na_shifting_bottom_nav_tab_min_width_inactive));
+            inactiveWidth = Math.min(inactiveWidth, mView.getResources().getDimensionPixelSize(R.dimen.na_shifting_bottom_nav_tab_max_width_inactive));
+            return inactiveWidth;
         }
 
         private void animateTextSize(boolean selected, boolean fixed) {
@@ -461,17 +480,17 @@ public class BottomNavigationBar extends LinearLayout {
             return ((ImageView) mView.getChildAt(0)).getDrawable();
         }
 
-        public Tab setIcon(Drawable d) {
-            mOriginalDrawable = d;
-            ((ImageView) mView.getChildAt(0)).setImageDrawable(tintDrawableForTheme(mOriginalDrawable));
-            return this;
-        }
-
         public Tab setIcon(@DrawableRes int res) {
             mOriginalDrawableResource = res;
             mOriginalDrawable = ContextCompat.getDrawable(mView.getContext(), res);
             ((ImageView) mView.getChildAt(0))
                     .setImageDrawable(tintDrawableForTheme(mOriginalDrawable));
+            return this;
+        }
+
+        public Tab setIcon(Drawable d) {
+            mOriginalDrawable = d;
+            ((ImageView) mView.getChildAt(0)).setImageDrawable(tintDrawableForTheme(mOriginalDrawable));
             return this;
         }
 
@@ -485,13 +504,13 @@ public class BottomNavigationBar extends LinearLayout {
             return ((TextView) mView.getChildAt(1)).getText();
         }
 
-        public Tab setText(CharSequence s) {
-            ((TextView) mView.getChildAt(1)).setText(s);
+        public Tab setText(@StringRes int res) {
+            ((TextView) mView.getChildAt(1)).setText(res);
             return this;
         }
 
-        public Tab setText(@StringRes int res) {
-            ((TextView) mView.getChildAt(1)).setText(res);
+        public Tab setText(CharSequence s) {
+            ((TextView) mView.getChildAt(1)).setText(s);
             return this;
         }
 
