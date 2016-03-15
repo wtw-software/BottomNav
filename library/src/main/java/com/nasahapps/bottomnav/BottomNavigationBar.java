@@ -39,7 +39,7 @@ public class BottomNavigationBar extends LinearLayout {
 
     @ColorInt
     private int mAccentColor;
-    private int mTabCount, mCurrentTab;
+    private int mCurrentTab;
     private boolean mUsesDarkTheme;
     private ArrayList<Tab> mTabs = new ArrayList<>();
     private LayoutGravity mLayoutGravity = LayoutGravity.FILL;
@@ -100,26 +100,24 @@ public class BottomNavigationBar extends LinearLayout {
 
     public void addTab(Tab tab, int position, boolean setSelected) {
         checkTabCount();
-        mTabCount++;
         mTabs.add(position, tab);
-        if (setSelected || mTabCount == 1) {
+        if (setSelected || getTabCount() == 1) {
             setTabSelected(position);
         }
 
-        boolean fixed = mTabCount <= 3;
+        boolean fixed = getTabCount() <= 3;
         addView(tab.getView(), new LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT));
         for (Tab tab1 : mTabs) {
             tab1.adjustForFixedMode(fixed);
-//            tab1.adjustTabWidth(fixed);
         }
     }
 
     public Tab newTab() {
-        return new Tab(getContext(), mTabCount < 3);
+        return new Tab(getContext(), getTabCount() < 3);
     }
 
     private void checkTabCount() {
-        if (mTabCount >= 5) {
+        if (getTabCount() >= 5) {
             throw new RuntimeException("You can only have a max of 5 tabs! If you want more, it's " +
                     "best to use a navigation drawer.");
         }
@@ -151,11 +149,10 @@ public class BottomNavigationBar extends LinearLayout {
     }
 
     public int getTabCount() {
-        return mTabCount;
+        return mTabs.size();
     }
 
     public void removeAllTabs() {
-        mTabCount = 0;
         mTabs = new ArrayList<>();
         removeAllViews();
     }
@@ -168,11 +165,19 @@ public class BottomNavigationBar extends LinearLayout {
                 break;
             }
         }
+
+        for (Tab tab1 : mTabs) {
+            tab1.adjustForFixedMode(mTabs.size() <= 3);
+        }
     }
 
     public void removeTabAt(int position) {
         removeView(mTabs.get(position).getView());
         mTabs.remove(position);
+
+        for (Tab tab1 : mTabs) {
+            tab1.adjustForFixedMode(mTabs.size() <= 3);
+        }
     }
 
     public void setUsesDarkTheme(boolean usesDarkTheme) {
@@ -190,7 +195,7 @@ public class BottomNavigationBar extends LinearLayout {
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
         for (Tab tab : mTabs) {
-            tab.adjustTabWidth(mTabCount <= 3);
+            tab.adjustTabWidth(getTabCount() <= 3);
         }
     }
 
@@ -355,12 +360,12 @@ public class BottomNavigationBar extends LinearLayout {
             // the absolute minimum width of the entire bottom nav bar must be at least 352dp for 5 tabs
             // (288 for 4 tabs)
             // Any smaller and we can't apply the suggested tab width
-            if ((mTabCount == 4 && Utils.pixelToDp(mView.getContext(), fullWidth) <= 288)
-                    || (mTabCount == 5 && Utils.pixelToDp(mView.getContext(), fullWidth) <= 352)) {
-                tabWidth = fullWidth / mTabCount;
+            if ((getTabCount() == 4 && Utils.pixelToDp(mView.getContext(), fullWidth) <= 288)
+                    || (getTabCount() == 5 && Utils.pixelToDp(mView.getContext(), fullWidth) <= 352)) {
+                tabWidth = fullWidth / getTabCount();
             } else {
                 if (fixed) {
-                    tabWidth = Math.max(fullWidth / mTabCount, mView.getResources().getDimensionPixelSize(R.dimen.na_fixed_bottom_nav_tab_min_width));
+                    tabWidth = Math.max(fullWidth / getTabCount(), mView.getResources().getDimensionPixelSize(R.dimen.na_fixed_bottom_nav_tab_min_width));
                     tabWidth = Math.min(tabWidth, mView.getResources().getDimensionPixelSize(R.dimen.na_fixed_bottom_nav_tab_max_width));
                 } else {
                     tabWidth = mIsSelected ? calculateActiveTabWidth() : calculateInactiveTabWidth();
@@ -375,7 +380,7 @@ public class BottomNavigationBar extends LinearLayout {
         private int calculateActiveTabWidth() {
             int fullWidth = ((View) mView.getParent()).getMeasuredWidth();
             int inactiveMinWidth = mView.getResources().getDimensionPixelSize(R.dimen.na_shifting_bottom_nav_tab_min_width_inactive);
-            int activeWidth = fullWidth - ((mTabCount - 1) * inactiveMinWidth);
+            int activeWidth = fullWidth - ((getTabCount() - 1) * inactiveMinWidth);
             activeWidth = Math.max(activeWidth, mView.getResources().getDimensionPixelSize(R.dimen.na_shifting_bottom_nav_tab_min_width_active));
             activeWidth = Math.min(activeWidth, mView.getResources().getDimensionPixelSize(R.dimen.na_shifting_bottom_nav_tab_max_width_active));
             return activeWidth;
@@ -384,7 +389,7 @@ public class BottomNavigationBar extends LinearLayout {
         private int calculateInactiveTabWidth() {
             int activeWidth = calculateActiveTabWidth();
             int fullWidth = ((View) mView.getParent()).getMeasuredWidth();
-            int inactiveWidth = ((fullWidth - activeWidth) / (mTabCount - 1));
+            int inactiveWidth = ((fullWidth - activeWidth) / (getTabCount() - 1));
             inactiveWidth = Math.max(inactiveWidth, mView.getResources().getDimensionPixelSize(R.dimen.na_shifting_bottom_nav_tab_min_width_inactive));
             inactiveWidth = Math.min(inactiveWidth, mView.getResources().getDimensionPixelSize(R.dimen.na_shifting_bottom_nav_tab_max_width_inactive));
             return inactiveWidth;
@@ -434,6 +439,7 @@ public class BottomNavigationBar extends LinearLayout {
                         mUsesDarkTheme ? R.color.inactive_tint_dark : R.color.inactive_tint);
             }
             if (fixed) {
+                mView.getChildAt(1).setVisibility(VISIBLE);
                 ValueAnimator textColorAnim = ValueAnimator.ofObject(new ArgbEvaluator(),
                         ((TextView) mView.getChildAt(1)).getCurrentTextColor(), endingColor);
                 textColorAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
@@ -480,17 +486,17 @@ public class BottomNavigationBar extends LinearLayout {
             return ((ImageView) mView.getChildAt(0)).getDrawable();
         }
 
+        public Tab setIcon(Drawable d) {
+            mOriginalDrawable = d;
+            ((ImageView) mView.getChildAt(0)).setImageDrawable(tintDrawableForTheme(mOriginalDrawable));
+            return this;
+        }
+
         public Tab setIcon(@DrawableRes int res) {
             mOriginalDrawableResource = res;
             mOriginalDrawable = ContextCompat.getDrawable(mView.getContext(), res);
             ((ImageView) mView.getChildAt(0))
                     .setImageDrawable(tintDrawableForTheme(mOriginalDrawable));
-            return this;
-        }
-
-        public Tab setIcon(Drawable d) {
-            mOriginalDrawable = d;
-            ((ImageView) mView.getChildAt(0)).setImageDrawable(tintDrawableForTheme(mOriginalDrawable));
             return this;
         }
 
@@ -504,13 +510,13 @@ public class BottomNavigationBar extends LinearLayout {
             return ((TextView) mView.getChildAt(1)).getText();
         }
 
-        public Tab setText(@StringRes int res) {
-            ((TextView) mView.getChildAt(1)).setText(res);
+        public Tab setText(CharSequence s) {
+            ((TextView) mView.getChildAt(1)).setText(s);
             return this;
         }
 
-        public Tab setText(CharSequence s) {
-            ((TextView) mView.getChildAt(1)).setText(s);
+        public Tab setText(@StringRes int res) {
+            ((TextView) mView.getChildAt(1)).setText(res);
             return this;
         }
 
