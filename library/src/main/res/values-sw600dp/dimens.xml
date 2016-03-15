@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="na_fixed_bottom_nav_tab_min_width">120dp</dimen>
+</resources>

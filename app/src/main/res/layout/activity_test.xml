@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+             android:layout_width="match_parent"
+             android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/na_fixed_bottom_nav_height"
+        android:layout_gravity="bottom"
+        android:background="#fff"
+        android:elevation="@dimen/na_bottom_nav_elevation"
+        android:gravity="center_horizontal"
+        android:orientation="horizontal">
+
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:minWidth="@dimen/na_fixed_bottom_nav_tab_min_width"
+            android:paddingBottom="@dimen/na_fixed_bottom_nav_padding_bottom"
+            android:paddingLeft="@dimen/na_fixed_bottom_nav_padding_sides"
+            android:paddingRight="@dimen/na_fixed_bottom_nav_padding_sides"
+            android:paddingTop="@dimen/na_fixed_bottom_nav_padding_top_inactive">
+
+            <ImageView
+                android:layout_width="@dimen/na_fixed_bottom_nav_icon_size"
+                android:layout_height="@dimen/na_fixed_bottom_nav_icon_size"
+                android:layout_gravity="center_horizontal"
+                android:alpha="@dimen/na_inactive_opacity"
+                android:src="@drawable/ic_history"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal|bottom"
+                android:text="Recents"
+                android:textSize="@dimen/na_fixed_bottom_nav_text_size_inactive"/>
+
+        </FrameLayout>
+
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:minWidth="@dimen/na_fixed_bottom_nav_tab_min_width"
+            android:paddingBottom="@dimen/na_fixed_bottom_nav_padding_bottom"
+            android:paddingLeft="@dimen/na_fixed_bottom_nav_padding_sides"
+            android:paddingRight="@dimen/na_fixed_bottom_nav_padding_sides"
+            android:paddingTop="@dimen/na_fixed_bottom_nav_padding_top_inactive">
+
+            <ImageView
+                android:layout_width="@dimen/na_fixed_bottom_nav_icon_size"
+                android:layout_height="@dimen/na_fixed_bottom_nav_icon_size"
+                android:layout_gravity="center_horizontal"
+                android:src="@drawable/ic_favorite"
+                android:tint="@color/colorAccent"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal|bottom"
+                android:text="Favorites"
+                android:textColor="@color/colorAccent"
+                android:textSize="@dimen/na_fixed_bottom_nav_text_size_inactive"/>
+
+        </FrameLayout>
+
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:minWidth="@dimen/na_fixed_bottom_nav_tab_min_width"
+            android:paddingBottom="@dimen/na_fixed_bottom_nav_padding_bottom"
+            android:paddingLeft="@dimen/na_fixed_bottom_nav_padding_sides"
+            android:paddingRight="@dimen/na_fixed_bottom_nav_padding_sides"
+            android:paddingTop="@dimen/na_fixed_bottom_nav_padding_top_inactive">
+
+            <ImageView
+                android:layout_width="@dimen/na_fixed_bottom_nav_icon_size"
+                android:layout_height="@dimen/na_fixed_bottom_nav_icon_size"
+                android:layout_gravity="center_horizontal"
+                android:alpha="@dimen/na_inactive_opacity"
+                android:src="@drawable/ic_location"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal|bottom"
+                android:text="Nearby"
+                android:textSize="@dimen/na_fixed_bottom_nav_text_size_inactive"/>
+
+        </FrameLayout>
+
+    </LinearLayout>
+
+</FrameLayout>
