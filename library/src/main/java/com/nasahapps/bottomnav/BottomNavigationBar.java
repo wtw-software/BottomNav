@@ -1,12 +1,14 @@
 package com.nasahapps.bottomnav;
 
 import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
 import android.animation.ArgbEvaluator;
 import android.animation.LayoutTransition;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.support.annotation.ColorInt;
@@ -22,8 +24,10 @@ import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewAnimationUtils;
 import android.view.ViewGroup;
 import android.view.animation.Interpolator;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -33,7 +37,7 @@ import java.util.ArrayList;
 /**
  * Created by Hakeem on 3/14/16.
  */
-public class BottomNavigationBar extends LinearLayout {
+public class BottomNavigationBar extends FrameLayout {
 
     public static final int INVALID_TAB_POSITION = -1;
     private static final long ANIM_DURATION = 250;
@@ -42,10 +46,13 @@ public class BottomNavigationBar extends LinearLayout {
     @ColorInt
     private int mAccentColor;
     private int mCurrentTab;
-    private boolean mUsesDarkTheme;
+    private boolean mUsesDarkTheme, mInitialized;
     private ArrayList<Tab> mTabs = new ArrayList<>();
-    private LayoutGravity mLayoutGravity = LayoutGravity.FILL;
     private OnTabSelectedListener mOnTabSelectedListener;
+    @ColorInt
+    private int[] mBackgroundColors;
+    private LinearLayout mTabLayout;
+    private View mCircularRevealBackground, mCircularRevealForeground;
 
     public BottomNavigationBar(Context context) {
         super(context);
@@ -58,6 +65,21 @@ public class BottomNavigationBar extends LinearLayout {
     }
 
     private void initView(AttributeSet attrs) {
+        mCircularRevealBackground = new View(getContext());
+        addView(mCircularRevealBackground, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+
+        mCircularRevealForeground = new View(getContext());
+        addView(mCircularRevealForeground, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+
+        mTabLayout = new LinearLayout(getContext());
+        mTabLayout.setOrientation(LinearLayout.HORIZONTAL);
+        mTabLayout.setGravity(Gravity.CENTER_HORIZONTAL);
+        ViewCompat.setElevation(mTabLayout, getResources().getDimensionPixelSize(R.dimen.na_bottom_nav_elevation));
+        addView(mTabLayout, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+
         if (attrs != null) {
             TypedArray ta = getContext().getTheme().obtainStyledAttributes(attrs, R.styleable.BottomNavigationBar, 0, 0);
 
@@ -71,6 +93,13 @@ public class BottomNavigationBar extends LinearLayout {
                     getContext().getTheme().resolveAttribute(R.attr.colorAccent, tv, true);
                     mAccentColor = tv.data;
                 }
+
+                if (getBackground() instanceof ColorDrawable) {
+                    int backgroundColor = ((ColorDrawable) getBackground()).getColor();
+                    mCircularRevealBackground.setBackgroundColor(backgroundColor);
+                } else {
+                    mCircularRevealBackground.setBackgroundColor(Color.WHITE);
+                }
             } finally {
                 ta.recycle();
             }
@@ -83,9 +112,6 @@ public class BottomNavigationBar extends LinearLayout {
                 addTab(newTab().setText("Music").setIcon(R.drawable.ic_na_test_music));
             }
         }
-
-        ViewCompat.setElevation(this, getResources().getDimensionPixelSize(R.dimen.na_bottom_nav_elevation));
-        setGravity(Gravity.CENTER_HORIZONTAL);
     }
 
     public void addTab(Tab tab) {
@@ -108,7 +134,7 @@ public class BottomNavigationBar extends LinearLayout {
         }
 
         boolean fixed = getTabCount() <= 3;
-        addView(tab.getView(), new LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT));
+        mTabLayout.addView(tab.getView(), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT));
         for (Tab tab1 : mTabs) {
             tab1.adjustForFixedMode(fixed);
         }
@@ -133,6 +159,10 @@ public class BottomNavigationBar extends LinearLayout {
 
             mCurrentTab = position;
             mTabs.get(position).setSelected(true);
+
+            if (mUsesDarkTheme && mBackgroundColors != null) {
+                changeBackgroundColor(mCurrentTab);
+            }
         }
     }
 
@@ -156,13 +186,13 @@ public class BottomNavigationBar extends LinearLayout {
 
     public void removeAllTabs() {
         mTabs = new ArrayList<>();
-        removeAllViews();
+        mTabLayout.removeAllViews();
     }
 
     public void removeTab(Tab tab) {
         for (int i = 0; i < mTabs.size(); i++) {
             if (mTabs.get(i).equals(tab)) {
-                removeView(mTabs.get(i).getView());
+                mTabLayout.removeView(mTabs.get(i).getView());
                 mTabs.remove(i);
 
                 if (getSelectedTabPosition() == INVALID_TAB_POSITION) {
@@ -179,7 +209,7 @@ public class BottomNavigationBar extends LinearLayout {
     }
 
     public void removeTabAt(int position) {
-        removeView(mTabs.get(position).getView());
+        mTabLayout.removeView(mTabs.get(position).getView());
         mTabs.remove(position);
 
         if (getSelectedTabPosition() == INVALID_TAB_POSITION) {
@@ -198,8 +228,81 @@ public class BottomNavigationBar extends LinearLayout {
         }
     }
 
+    public void setAccentColor(int accentColor) {
+        mAccentColor = accentColor;
+    }
+
+    @Override
+    public void setBackgroundColor(int color) {
+        mCircularRevealBackground.setBackgroundColor(color);
+        setAccentColor(Color.WHITE);
+        setUsesDarkTheme(true);
+    }
+
     public void setOnTabSelectedListener(OnTabSelectedListener listener) {
         mOnTabSelectedListener = listener;
+    }
+
+    public void setBackgroundColors(int[] backgroundColors) {
+        if (backgroundColors.length != mTabs.size()) {
+            throw new IllegalArgumentException("Background colors array length must match the number of tabs!");
+        }
+
+        mBackgroundColors = backgroundColors;
+        changeBackgroundColor(getSelectedTabPosition());
+    }
+
+    private void changeBackgroundColor(final int position) {
+        if (mInitialized) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                // Do a circular view animation
+                mCircularRevealForeground.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        int[] absPosition = new int[2];
+                        mTabs.get(position).getView().getLocationOnScreen(absPosition);
+                        int cx = absPosition[0] + (mTabs.get(position).getView().getWidth() / 2);
+                        int cy = mTabs.get(position).getView().getHeight() / 2;
+                        int endRadius = (int) (getMeasuredWidth() * 1.1);
+                        mCircularRevealForeground.setBackgroundColor(mBackgroundColors[position]);
+                        Animator anim = ViewAnimationUtils.createCircularReveal(mCircularRevealForeground,
+                                cx, cy, 0, endRadius);
+                        anim.addListener(new AnimatorListenerAdapter() {
+                            @Override
+                            public void onAnimationEnd(Animator animation) {
+                                mCircularRevealBackground.setBackgroundColor(mBackgroundColors[position]);
+                            }
+                        });
+                        anim.setDuration(ANIM_DURATION * 3);
+                        anim.setInterpolator(ANIM_INTERPOLATOR);
+                        anim.start();
+                    }
+                });
+            } else {
+                // Do a simple color fade
+                int startingColor;
+                if (getBackground() instanceof ColorDrawable) {
+                    startingColor = ((ColorDrawable) getBackground()).getColor();
+                } else {
+                    startingColor = Color.WHITE;
+                }
+
+                ValueAnimator backgroundAnim = ValueAnimator.ofObject(new ArgbEvaluator(),
+                        startingColor, mBackgroundColors[position]);
+                backgroundAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                    @Override
+                    public void onAnimationUpdate(ValueAnimator animation) {
+                        setBackgroundColor((int) animation.getAnimatedValue());
+                    }
+                });
+                backgroundAnim.setDuration(ANIM_DURATION);
+                backgroundAnim.setInterpolator(ANIM_INTERPOLATOR);
+                backgroundAnim.start();
+            }
+        } else {
+            mInitialized = true;
+            setBackgroundColor(mBackgroundColors[position]);
+        }
     }
 
     @Override
@@ -208,11 +311,6 @@ public class BottomNavigationBar extends LinearLayout {
         for (Tab tab : mTabs) {
             tab.adjustTabWidth(getTabCount() <= 3);
         }
-    }
-
-    public enum LayoutGravity {
-        CENTER,
-        FILL
     }
 
     public interface OnTabSelectedListener {
@@ -260,7 +358,7 @@ public class BottomNavigationBar extends LinearLayout {
                 // but post-Kitkat, we'll use the new Transition APIs for layout adjustments
                 mView.setLayoutTransition(new LayoutTransition());
             }
-            mView.setOrientation(VERTICAL);
+            mView.setOrientation(LinearLayout.VERTICAL);
             mView.setGravity(Gravity.CENTER);
 
             adjustMinimumWidth(mIsFixed);
@@ -392,7 +490,7 @@ public class BottomNavigationBar extends LinearLayout {
                 }
             }
 
-            LayoutParams lp = (LayoutParams) mView.getLayoutParams();
+            LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) mView.getLayoutParams();
             lp.width = tabWidth;
             mView.setLayoutParams(lp);
         }
@@ -512,17 +610,17 @@ public class BottomNavigationBar extends LinearLayout {
             return ((ImageView) mView.getChildAt(0)).getDrawable();
         }
 
-        public Tab setIcon(Drawable d) {
-            mOriginalDrawable = d;
-            ((ImageView) mView.getChildAt(0)).setImageDrawable(tintDrawableForTheme(mOriginalDrawable));
-            return this;
-        }
-
         public Tab setIcon(@DrawableRes int res) {
             mOriginalDrawableResource = res;
             mOriginalDrawable = ContextCompat.getDrawable(mView.getContext(), res);
             ((ImageView) mView.getChildAt(0))
                     .setImageDrawable(tintDrawableForTheme(mOriginalDrawable));
+            return this;
+        }
+
+        public Tab setIcon(Drawable d) {
+            mOriginalDrawable = d;
+            ((ImageView) mView.getChildAt(0)).setImageDrawable(tintDrawableForTheme(mOriginalDrawable));
             return this;
         }
 
@@ -536,13 +634,13 @@ public class BottomNavigationBar extends LinearLayout {
             return ((TextView) mView.getChildAt(1)).getText();
         }
 
-        public Tab setText(CharSequence s) {
-            ((TextView) mView.getChildAt(1)).setText(s);
+        public Tab setText(@StringRes int res) {
+            ((TextView) mView.getChildAt(1)).setText(res);
             return this;
         }
 
-        public Tab setText(@StringRes int res) {
-            ((TextView) mView.getChildAt(1)).setText(res);
+        public Tab setText(CharSequence s) {
+            ((TextView) mView.getChildAt(1)).setText(s);
             return this;
         }
 
